@@ -7,4 +7,4 @@
   3. **Top-K 檢索與組裝**：取出最相關的前幾名段落，與使用者的問題打包成 Prompt 送給 LLM 生成回答。
 - **生活化比喻**：跟圖書館員說「我想找讓人放鬆的書」，館員不會只找書名有「放鬆」兩字的書，而是幫你挑出療癒與冥想類的書。
 - **相關概念連結**：[[chunking-and-embedding]]、[[rag-overview]]
-- **資料來源**：`raw/04_vector_retrieval.md`
+- **資料來源**：`raw/04_vector_retrieval.md`（IBM RAG 官方技術文件）
