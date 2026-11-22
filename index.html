@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG 入門：如何讓 AI 學會「開書考」？</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-light: #334155;
+      --primary: #38bdf8;
+      --accent: #a78bfa;
+      --success: #34d399;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .progress-bar {
+      height: 4px;
+      background: var(--surface);
+      width: 100%;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      width: 12.5%;
+      transition: width 0.3s ease;
+    }
+    main {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 3rem;
+    }
+    .slide {
+      display: none;
+      width: 100%;
+      max-width: 1000px;
+      min-height: 520px;
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 3rem 3.5rem;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+      position: relative;
+      animation: fadeIn 0.35s ease;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .slide.active { display: flex; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .tag {
+      display: inline-block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.12);
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      margin-bottom: 1.2rem;
+      width: fit-content;
+    }
+    h1 {
+      font-size: 2.8rem;
+      line-height: 1.25;
+      margin-bottom: 1.2rem;
+      background: linear-gradient(135deg, #fff 30%, var(--primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      color: #fff;
+    }
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 0.5rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin-top: 0.5rem;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 1.4rem;
+    }
+    .card h3 {
+      font-size: 1.15rem;
+      margin-bottom: 0.6rem;
+      color: var(--primary);
+    }
+    .card p, .card li {
+      font-size: 1rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+    .card.warn h3 { color: var(--warn); }
+    .card.danger h3 { color: var(--danger); }
+    .card.success h3 { color: var(--success); }
+    .analogy {
+      margin-top: 1.5rem;
+      padding: 1rem 1.4rem;
+      background: rgba(167, 139, 250, 0.12);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      font-size: 1.05rem;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+    .flow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      margin: 1.2rem 0;
+    }
+    .flow-step {
+      flex: 1;
+      text-align: center;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 1.2rem 0.8rem;
+      border-radius: 12px;
+    }
+    .flow-step strong {
+      display: block;
+      font-size: 1.1rem;
+      color: var(--primary);
+      margin-bottom: 0.4rem;
+    }
+    .flow-arrow {
+      font-size: 1.5rem;
+      color: var(--muted);
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+    th, td {
+      padding: 0.9rem 1.1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      text-align: left;
+    }
+    th { color: var(--primary); background: rgba(15, 23, 42, 0.5); }
+    .source-badge {
+      position: absolute;
+      bottom: 1.2rem;
+      right: 1.8rem;
+      font-size: 0.8rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--muted);
+      background: rgba(15, 23, 42, 0.8);
+      padding: 0.3rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    footer {
+      padding: 1rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.9);
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .controls { display: flex; gap: 0.75rem; }
+    button {
+      background: var(--surface-light);
+      color: var(--text);
+      border: none;
+      padding: 0.55rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--primary); color: #0f172a; font-weight: 600; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    .hint { font-size: 0.85rem; color: var(--muted); }
+    @media (max-width: 768px) {
+      main { padding: 1rem; }
+      .slide { padding: 1.8rem; min-height: auto; }
+      h1 { font-size: 1.9rem; }
+      h2 { font-size: 1.45rem; }
+      .grid-2, .grid-3, .flow { grid-template-columns: 1fr; flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <main>
+    <!-- Slide 1: Cover -->
+    <section class="slide active">
+      <span class="tag">LLM Wiki 教學簡報</span>
+      <h1>RAG 入門：<br/>如何讓 AI 學會「開書考」？</h1>
+      <p class="subtitle">不用重新訓練模型，就能讓 AI 讀懂你的最新文件、大幅減少瞎掰（幻覺）的核心技術。</p>
+      <div class="grid-3">
+        <div class="card"><h3>適合對象</h3><p>用過 ChatGPT、想了解 AI 如何結合外部知識庫的新手。</p></div>
+        <div class="card"><h3>核心架構</h3><p>切塊向量化 → 語意檢索 → 增強生成。</p></div>
+        <div class="card"><h3>知識來源</h3><p>本簡報 100% 由 RAG LLM Wiki 知識庫生成與驗證。</p></div>
+      </div>
+      <span class="source-badge">Source: index.md</span>
+    </section>
+
+    <!-- Slide 2: LLM Limitations -->
+    <section class="slide">
+      <span class="tag">01 / 痛點解析</span>
+      <h2>為什麼 AI 常常會一本正經地胡說八道？</h2>
+      <div class="grid-3">
+        <div class="card danger">
+          <h3>知識有截止日</h3>
+          <p>模型訓練完後記憶就凍結了，無法得知最新新聞或剛公布的法規。</p>
+        </div>
+        <div class="card danger">
+          <h3>沒有私有資料</h3>
+          <p>它沒讀過你電腦裡的 PDF、個人筆記或公司內部規章。</p>
+        </div>
+        <div class="card danger">
+          <h3>幻覺（Hallucination）</h3>
+          <p>遇到不會的題目時，會用自信語氣拼湊出聽起來合理但錯誤的答案。</p>
+        </div>
+      </div>
+      <div class="analogy">
+        💡 <strong>生活化比喻</strong>：傳統 LLM 就像參加<strong>「閉書考」</strong>的學霸，只能靠腦中舊記憶作答，遇到沒看過的題目就容易開始瞎掰。
+      </div>
+      <span class="source-badge">Source: wiki/llm-limitations.md</span>
+    </section>
+
+    <!-- Slide 3: What is RAG -->
+    <section class="slide">
+      <span class="tag">02 / 核心概念</span>
+      <h2>什麼是 RAG（檢索增強生成）？</h2>
+      <p class="subtitle">Retrieval-Augmented Generation：在 AI 回答前，先幫它翻找參考資料。</p>
+      <div class="flow">
+        <div class="flow-step"><strong>1. 檢索 (Retrieval)</strong>去資料庫找出最相關的段落</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>2. 增強 (Augmented)</strong>把資料連同問題一起交給 AI</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><strong>3. 生成 (Generation)</strong>AI 依據參考資料整理出答案</div>
+      </div>
+      <div class="analogy">
+        💡 <strong>生活化比喻</strong>：把考試從「閉書考」改成<strong>「開書考」</strong>，現場查到資料再寫答案，還能標明出自哪一頁。
+      </div>
+      <span class="source-badge">Source: wiki/rag-overview.md</span>
+    </section>
+
+    <!-- Slide 4: RAG vs Fine-tuning -->
+    <section class="slide">
+      <span class="tag">02 / 觀念比較</span>
+      <h2>RAG vs. 微調（Fine-tuning）差在哪？</h2>
+      <table>
+        <thead>
+          <tr><th>比較維度</th><th>RAG（開書考）</th><th>微調 Fine-tuning（背課本）</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>核心做法</strong></td><td>回答前動態查詢外部文件</td><td>重新訓練並調整模型內部參數</td></tr>
+          <tr><td><strong>資料更新</strong></td><td>抽換檔案即可，即時且低成本</td><td>需重新訓練，耗時且耗算力</td></tr>
+          <tr><td><strong>適合場景</strong></td><td>補充最新事實、私有知識庫問答</td><td>調整說話語氣、特定輸出格式</td></tr>
+          <tr><td><strong>可追溯性</strong></td><td>高（可直接標註資料來源）</td><td>低（難以確認記憶從何而來）</td></tr>
+        </tbody>
+      </table>
+      <span class="source-badge">Source: wiki/rag-overview.md</span>
+    </section>
+
+    <!-- Slide 5: Chunking & Embedding -->
+    <section class="slide">
+      <span class="tag">03 / 資料前處理</span>
+      <h2>第一步：把文件變好找（切塊與向量化）</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>✂️ 切塊（Chunking）</h3>
+          <p>將長文章切成約 300–500 字的小段落，並保留前後<strong>重疊區間（Overlap）</strong>，防止關鍵句子剛好被切斷而失去上下文。</p>
+        </div>
+        <div class="card">
+          <h3>🔢 向量化（Embedding）</h3>
+          <p>透過模型把文字轉成數字陣列（向量）。<strong>語意越相近的句子</strong>，在空間中的數字距離就越接近。</p>
+        </div>
+      </div>
+      <div class="analogy">
+        💡 <strong>生活化比喻</strong>：把厚百科全書拆成一張張重點索引卡（切塊），再依主題相似度擺進圖書館對應的書架座標（向量化）。
+      </div>
+      <span class="source-badge">Source: wiki/chunking-and-embedding.md</span>
+    </section>
+
+    <!-- Slide 6: Vector Search -->
+    <section class="slide">
+      <span class="tag">04 / 語意檢索</span>
+      <h2>第二步：用「意思」找資料，而不只是關鍵字</h2>
+      <div class="grid-2">
+        <div class="card warn">
+          <h3>傳統關鍵字搜尋</h3>
+          <p>只比對字面是否完全相同。文件寫「筆電無法開機」，搜「電腦沒反應」可能就找不到。</p>
+        </div>
+        <div class="card success">
+          <h3>向量語意搜尋（Semantic Search）</h3>
+          <p>將問題也轉成向量，到<strong>向量資料庫</strong>計算相似度，精準撈出最相關的前幾名段落（Top-K）。</p>
+        </div>
+      </div>
+      <div class="analogy">
+        💡 <strong>最後組裝</strong>：系統將「使用者的問題 + Top-K 參考段落」組合成完整提示詞（Prompt），送給 LLM 產出最終答案。
+      </div>
+      <span class="source-badge">Source: wiki/vector-search.md</span>
+    </section>
+
+    <!-- Slide 7: RAG Limitations -->
+    <section class="slide">
+      <span class="tag">05 / 實務地雷</span>
+      <h2>RAG 不是萬靈丹：常見的三大地雷</h2>
+      <div class="grid-3">
+        <div class="card warn">
+          <h3>1. 切塊失衡</h3>
+          <p>切太碎會失去上下文；切太大會塞入過多無關雜訊，干擾 AI 判斷。</p>
+        </div>
+        <div class="card danger">
+          <h3>2. 檢索失敗</h3>
+          <p>垃圾進、垃圾出（Garbage In, Garbage Out）。找錯段落時，模型再強也答不對。</p>
+        </div>
+        <div class="card danger">
+          <h3>3. 幻覺無法歸零</h3>
+          <p>模型仍可能誤讀資料或偷渡舊記憶，須明確指示「找不到就說不知道」。</p>
+        </div>
+      </div>
+      <div class="analogy">
+        💡 <strong>生活化比喻</strong>：開書考時如果翻錯章節，或課本被撕得支離破碎，就算能翻書還是會寫錯。
+      </div>
+      <span class="source-badge">Source: wiki/rag-limitations.md</span>
+    </section>
+
+    <!-- Slide 8: Summary -->
+    <section class="slide">
+      <span class="tag">06 / 重點回顧</span>
+      <h2>三句話帶走今天的 RAG 入門</h2>
+      <div class="grid-3">
+        <div class="card success">
+          <h3>1. 解決痛點</h3>
+          <p>用「開書考」架構補足 LLM 知識過期、無私有資料與幻覺問題。</p>
+        </div>
+        <div class="card success">
+          <h3>2. 運作流程</h3>
+          <p>切塊向量化 → 語意搜尋撈出 Top-K 段落 → 交給 LLM 生成回答。</p>
+        </div>
+        <div class="card success">
+          <h3>3. 關鍵心法</h3>
+          <p>檢索品質決定回答上限，切塊策略與「不知則不答」的約束缺一不可。</p>
+        </div>
+      </div>
+      <span class="source-badge">Source: index.md</span>
+    </section>
+  </main>
+
+  <footer>
+    <div class="hint">使用鍵盤 ← → 或空白鍵切換投影片</div>
+    <div id="counter" style="font-weight: 600; color: var(--primary);">1 / 8</div>
+    <div class="controls">
+      <button id="prevBtn" onclick="changeSlide(-1)">上一頁</button>
+      <button id="nextBtn" onclick="changeSlide(1)">下一頁</button>
+    </div>
+  </footer>
+
+  <script>
+    let current = 0;
+    const slides = document.querySelectorAll('.slide');
+    const progress = document.getElementById('progress');
+    const counter = document.getElementById('counter');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    function updateSlide() {
+      slides.forEach((s, i) => s.classList.toggle('active', i === current));
+      progress.style.width = ((current + 1) / slides.length * 100) + '%';
+      counter.textContent = `${current + 1} / ${slides.length}`;
+      prevBtn.disabled = current === 0;
+      nextBtn.disabled = current === slides.length - 1;
+    }
+
+    function changeSlide(dir) {
+      current = Math.max(0, Math.min(slides.length - 1, current + dir));
+      updateSlide();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') changeSlide(1);
+      if (e.key === 'ArrowLeft') changeSlide(-1);
+    });
+
+    updateSlide();
+  </script>
+</body>
+</html>
